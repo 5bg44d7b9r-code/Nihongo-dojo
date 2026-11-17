@@ -188,6 +188,8 @@ label.ghost{text-align:center;cursor:pointer}
 .mcard .fa.jp{font-size:var(--fs);font-weight:400}.mcard .fa.word{font-size:calc(var(--fs) * .5)}.mcard .fa.emo{font-size:var(--fs)}
 .mcard.match .fa{border-color:var(--good);background:var(--l4)}
 .mcard.gone{opacity:0;pointer-events:none;transform:scale(.85)}
+.mend .ncard{touch-action:none}.grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:-6px auto 10px}
+.mpill{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translate(-50%,150%);z-index:12;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 18px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.2);transition:transform .3s}.mpill.on{transform:translate(-50%,0)}
 .mend{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:12}
 .nreward{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .9s ease;pointer-events:none}
 .nreward img,.nreward video{max-width:88%;max-height:68%;object-fit:contain;border-radius:18px}
@@ -630,7 +632,7 @@ function profileHTML(){
    <button class="ghost" data-act="import">📥 Fortschritt wiederherstellen</button>
    <button class="ghost" data-act="treset">↩️ Heutigen Fortschritt zurücksetzen</button>
    <button class="ghost danger" data-act="reset">🔄 Gesamten Fortschritt zurücksetzen</button></div>
-  <p class="muted small" style="text-align:center">Nihongo Dojo · Version 4.5${hasVoice()?'':' · ⚠︎ Keine japanische Stimme gefunden'}</p>`;
+  <p class="muted small" style="text-align:center">Nihongo Dojo · Version 4.6${hasVoice()?'':' · ⚠︎ Keine japanische Stimme gefunden'}</p>`;
 }
 
 // ---------- Modals ----------
@@ -1643,7 +1645,19 @@ function memWin(){
    <div class="sgrid" style="margin:10px 0"><div class="stat"><div class="sv">${fmtS(secs)}</div><div class="sl">${newBest?'🏆 Neue Bestzeit!':'Bestzeit '+fmtS(best)}</div></div><div class="stat"><div class="sv">${M.moves}</div><div class="sl">Züge</div></div></div>
    ${xp?`<p style="margin:0 0 8px"><b>+${xp} XP</b></p>`:M.practice?'<p class="muted small" style="margin:0 0 8px">Übungsrunde – ohne XP</p>':''}
    <div class="row2">${again?`<button class="primary" style="margin-top:0" data-act="memagain">Nochmal${M.practice?'':` (${left})`}</button>`:''}<button class="ghost" style="margin-top:0" data-act="memquit">Zurück</button></div></div>`;
-  document.querySelector('.memv').appendChild(d);
+  document.querySelector('.memv').appendChild(d);memSwipe(d);
+}
+function memSwipe(d){
+  const card=d.querySelector('.ncard');card.insertAdjacentHTML('afterbegin','<div class="grab"></div>');
+  const pill=document.createElement('button');pill.className='mpill';pill.textContent='▲ Ergebnis';document.querySelector('.memv').appendChild(pill);
+  const hide=()=>{d.style.transition='transform .3s ease';d.style.transform='translateY(120%)';pill.classList.add('on');};
+  const show=()=>{d.style.transition='transform .3s ease';d.style.transform='translateY(0)';pill.classList.remove('on');};
+  pill.onclick=e=>{e.stopPropagation();show();};
+  let y0=null,dy=0;
+  d.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;y0=e.clientY;dy=0;d.style.transition='none';try{d.setPointerCapture(e.pointerId);}catch(_){}});
+  d.addEventListener('pointermove',e=>{if(y0==null)return;dy=Math.max(0,e.clientY-y0);d.style.transform=`translateY(${dy}px)`;});
+  const end=()=>{if(y0==null)return;y0=null;if(dy>70)hide();else show();};
+  d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
 }
 function openMemSet(){
   const pills=(k,vals)=>`<div class="pills" style="flex-wrap:wrap;margin:6px 0 12px">${vals.map(([v,l])=>`<button class="${S.settings[k]==v?'on':''}" data-act="mempill" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
