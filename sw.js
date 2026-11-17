@@ -1,5 +1,5 @@
 // Nihongo Dojo – Offline-Speicher
-const CACHE = 'nihongo-dojo-v1-8';
+const CACHE = 'nihongo-dojo-v1-9';
 const FILES = ['./', './index.html', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

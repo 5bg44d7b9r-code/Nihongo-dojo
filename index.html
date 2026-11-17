@@ -149,6 +149,11 @@ input.typein:focus{border-color:var(--ai)}
 .buddy img.bav.round{width:100px;height:100px;object-fit:cover;border-radius:50%;border:3px solid var(--card);margin-top:6px}
 .avprev{display:block;margin:10px auto;max-width:150px;max-height:170px;object-fit:contain}.avprev.round{width:130px;height:130px;object-fit:cover;border-radius:50%}
 label.ghost{text-align:center;cursor:pointer}
+.buddy.free{right:auto;transform:scale(.4);opacity:0;transition:transform .4s cubic-bezier(.3,1.35,.5,1),opacity .25s}
+.buddy.free.show{transform:scale(1);opacity:1}
+.buddy.drag{pointer-events:auto;touch-action:none;outline:2px dashed var(--shu);outline-offset:6px;border-radius:14px;cursor:grab}
+.dragbar{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 12px);z-index:25;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,.2);text-align:center}
+.dragbar p{margin:0 0 8px;font-size:14px}
 .buddy video.bav{width:120px;height:140px;object-fit:contain;border-radius:14px}
 .buddy video.bav.round{width:104px;height:104px;object-fit:cover;border-radius:50%;border:3px solid var(--card)}
 .avw{position:relative}
@@ -351,7 +356,7 @@ const ALT={shi:['si'],chi:['ti'],tsu:['tu'],fu:['hu'],ji:['zi','di'],zu:['du'],w
 
 // ---------- Speicher ----------
 const KEY='nihongoDojo.v1';
-const fresh=()=>({xp:0,items:{},days:{},settings:{sound:true,romaji:true,autoplay:true,buddy:true,silent:false,avatarOn:false,avatarRound:false,avatarAnim:'bounce',avatarOrder:'random',unlockAll:false,minutes:25,newPer:15},stats:{right:0,wrong:0,sessions:0}});
+const fresh=()=>({xp:0,items:{},days:{},settings:{sound:true,romaji:true,autoplay:true,buddy:true,silent:false,avatarOn:false,avatarRound:false,avatarAnim:'bounce',avatarOrder:'random',buddyPos:null,unlockAll:false,minutes:25,newPer:15},stats:{right:0,wrong:0,sessions:0}});
 function load(){try{const o=JSON.parse(localStorage.getItem(KEY));if(o&&o.items){const f=fresh();return Object.assign(f,o,{settings:Object.assign(f.settings,o.settings),stats:Object.assign(f.stats,o.stats)});}}catch(e){}return fresh();}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 let S=load();
@@ -442,6 +447,20 @@ async function delAv(id){try{await idbReq('readwrite',st=>st.delete(id));}catch(
 const ANIMS=[['bounce','Hüpfen'],['wiggle','Wackeln'],['float','Schweben'],['pulse','Pochen'],['spin','Drehen'],['random','Zufall']];
 function pickAv(){if(S.settings.avatarOrder==='seq'){avIdx=(avIdx+1)%AVS.length;return AVS[avIdx];}return rand(AVS);}
 function avMedia(a,cls){return a.type==='video'?`<video class="${cls}" src="${a.url}" muted playsinline autoplay loop preload="auto"></video>`:`<img class="${cls}" src="${a.url}" alt="">`;}
+function applyPos(el){const p=S.settings.buddyPos;
+  if(p){el.classList.add('free');const w=el.offsetWidth||200,hh=el.offsetHeight||140;el.style.left=Math.max(0,Math.min(innerWidth-w,p.x*innerWidth))+'px';el.style.top=Math.max(0,Math.min(innerHeight-hh,p.y*innerHeight))+'px';el.style.flexDirection=p.x<0.3?'row-reverse':'';}
+  else{el.classList.remove('free');el.style.left='';el.style.top='';el.style.flexDirection='';}}
+function posMode(){
+  closeModal();buddy(5,true);clearTimeout(buddyT);const el=$('#buddy');
+  if(!S.settings.buddyPos){el.classList.add('free');el.style.left=Math.max(0,innerWidth-el.offsetWidth)+'px';el.style.top=Math.round(innerHeight*0.38)+'px';}
+  el.classList.add('show','drag');
+  const bar=document.createElement('div');bar.className='dragbar';bar.innerHTML='<p>👆 Zieh den Begleiter mit dem Finger an die gewünschte Stelle.</p><div class="row2"><button class="ghost" data-act="posreset">Standard</button><button class="primary" style="margin-top:8px" data-act="posdone">Fertig</button></div>';document.body.appendChild(bar);
+  let st=null;
+  el.onpointerdown=e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}st={x:e.clientX,y:e.clientY,l:el.offsetLeft,t:el.offsetTop};};
+  el.onpointermove=e=>{if(!st)return;e.preventDefault();const l=Math.max(0,Math.min(innerWidth-el.offsetWidth,st.l+e.clientX-st.x)),t=Math.max(0,Math.min(innerHeight-el.offsetHeight,st.t+e.clientY-st.y));el.style.left=l+'px';el.style.top=t+'px';el.style.flexDirection=l/innerWidth<0.3?'row-reverse':'';};
+  el.onpointerup=el.onpointercancel=()=>{st=null;};
+}
+function endPos(){const el=$('#buddy'),bar=$('.dragbar');if(bar)bar.remove();if(el){el.onpointerdown=el.onpointermove=el.onpointerup=el.onpointercancel=null;el.classList.remove('drag','show');}}
 function buddy(combo,force){
   if(!S.settings.buddy&&!force)return;
   let el=document.getElementById('buddy');
@@ -451,7 +470,7 @@ function buddy(combo,force){
     const sp=shuffle(['✨','💖','⭐','🌸','💫','🎉']).slice(0,4).map((s,k)=>`<i style="--dx:${[-46,40,-30,52][k]}px;--dy:${[-40,-48,30,24][k]}px;animation-delay:${k*.08}s">${s}</i>`).join('');
     face=`<div class="avw a-${an}">${avMedia(a,'bav'+(S.settings.avatarRound?' round':''))}<div class="spark">${sp}</div></div>`;if(a.type==='video')dur=6000;}
   else face=hanaSVG(!!STREAK[combo]||Math.random()<.4);
-  el.innerHTML=`<div class="bb"><b class="jp">${jp}</b><small>${de}</small></div>${face}`;
+  el.innerHTML=`<div class="bb"><b class="jp">${jp}</b><small>${de}</small></div>${face}`;applyPos(el);
   const v=el.querySelector('video');if(v){try{v.currentTime=0;}catch(e){}v.play().catch(()=>{});}
   el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
   const hide=()=>{el.classList.remove('show');const vv=el.querySelector('video');if(vv)setTimeout(()=>vv.pause(),500);};
@@ -539,6 +558,7 @@ function profileHTML(){
    ${pills('newPer',[10,15,20],'Neue Elemente pro Session')}
    ${sw('silent','Lautlos-Modus 🔇','Keine Töne, keine Hör-Aufgaben – ideal für unterwegs')}
    ${sw('buddy','Begleiterin Hana 🌸','Taucht bei richtigen Antworten kurz auf')}
+   <button class="set" data-act="posmode"><span>📍 Begleiter-Position verschieben</span><span class="muted">›</span></button>
    ${sw('sound','Soundeffekte')}
    ${sw('autoplay','Aussprache automatisch abspielen')}
    ${sw('romaji','Romaji bei Wörtern zeigen','Lesehilfe in lateinischer Schrift')}
@@ -549,7 +569,7 @@ function profileHTML(){
    <button class="ghost" data-act="import">📥 Fortschritt wiederherstellen</button>
    <button class="ghost" data-act="treset">↩️ Heutigen Fortschritt zurücksetzen</button>
    <button class="ghost danger" data-act="reset">🔄 Gesamten Fortschritt zurücksetzen</button></div>
-  <p class="muted small" style="text-align:center" data-act="ver">Nihongo Dojo · Version 1.8${hasVoice()?'':' · ⚠︎ Keine japanische Stimme gefunden'}</p>`;
+  <p class="muted small" style="text-align:center" data-act="ver">Nihongo Dojo · Version 1.9${hasVoice()?'':' · ⚠︎ Keine japanische Stimme gefunden'}</p>`;
 }
 
 // ---------- Modals ----------
@@ -731,6 +751,7 @@ function openAvatar(){
   <b>Animation</b>${pills('avatarAnim',ANIMS)}
   <b>Reihenfolge</b>${pills('avatarOrder',[['random','Zufällig'],['seq','Nacheinander']])}
   <button class="ghost" data-act="avtest">👀 Vorschau zeigen</button>`:''}
+  <button class="ghost" data-act="posmode">📍 Position verschieben</button>
   <button class="primary" style="margin-top:10px" data-act="close">Fertig</button>`);
 }
 function shrinkImage(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
@@ -857,6 +878,9 @@ const ACT={
   avrm:async b=>{await delAv(b.dataset.id);if(!AVS.length){S.settings.avatarOn=false;save();}openAvatar();},
   avpill:b=>{S.settings[b.dataset.k]=b.dataset.v;save();openAvatar();},
   avtest:()=>{closeModal();buddy(5,true);},
+  posmode:()=>posMode(),
+  posdone:()=>{const el=$('#buddy');S.settings.buddyPos={x:el.offsetLeft/innerWidth,y:el.offsetTop/innerHeight};save();endPos();toast('Position gespeichert ✓');},
+  posreset:()=>{S.settings.buddyPos=null;save();endPos();toast('Standardposition');},
   treset:()=>{if(!S.snap||S.snap.date!==dk()){toast('Heute wurde noch nichts gelernt');return;}
     modal(`<h3>Heutigen Fortschritt zurücksetzen?</h3><p class="muted">Alles, was du heute gelernt hast (Zeichen, Wörter, XP, Minuten und Sessions), wird auf den Stand von heute Morgen zurückgesetzt. Ältere Fortschritte bleiben erhalten.</p><div class="row2"><button class="ghost danger" data-act="dotreset">Ja</button><button class="primary" style="margin-top:8px" data-act="close">Nein</button></div>`);},
   dotreset:()=>{const s=S.snap;S.items=JSON.parse(JSON.stringify(s.items));S.xp=s.xp;S.stats=Object.assign({},s.stats);delete S.days[dk()];save();closeModal();render();toast('Heutiger Fortschritt zurückgesetzt ✓');},
